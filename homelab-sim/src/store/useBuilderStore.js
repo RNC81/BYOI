@@ -1,10 +1,40 @@
 import { create } from 'zustand';
 
 const useBuilderStore = create((set, get) => ({
+  // ============ STATE ============
+  availableParts: [], // <-- C'est ici que la DB sera chargée
   installedParts: [],
   errors: [],
   selectedNode: null,
-  systemStats: { totalCost: 0, totalWattage: 0, workstationScore: 0, gamingScore: 0, powerEfficiency: 100 },
+  isLoading: false, // Pour afficher un loader si besoin
+  
+  // ============ COMPUTED STATS ============
+  systemStats: {
+    totalCost: 0,
+    totalWattage: 0,
+    workstationScore: 0,
+    gamingScore: 0,
+    powerEfficiency: 100
+  },
+
+  // ============ ACTIONS ============
+  
+  // 🚀 NOUVELLE ACTION : Charger les pièces depuis l'API
+  fetchParts: async () => {
+    set({ isLoading: true });
+    try {
+      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+      const response = await fetch(`${apiUrl}/parts`);
+      if (!response.ok) throw new Error('Failed to fetch parts');
+      
+      const data = await response.json();
+      set({ availableParts: data, isLoading: false });
+      console.log("✅ Parts loaded from API:", data.length);
+    } catch (error) {
+      console.error("❌ Error loading parts:", error);
+      set({ errors: [{ id: Date.now(), message: "API Error: Could not load parts", severity: 'critical' }], isLoading: false });
+    }
+  },
 
   addPart: (part, targetNode) => {
     const state = get();
@@ -64,6 +94,8 @@ const useBuilderStore = create((set, get) => ({
   resetBuild: () => set({ installedParts: [], errors: [], selectedNode: null, systemStats: { totalCost: 0, totalWattage: 0, workstationScore: 0, gamingScore: 0, powerEfficiency: 100 } })
 }));
 
+// --- Helper Functions (Internes) ---
+
 function validateSlotCompatibility(part, node) {
   const slotMap = { 'cpu': ['CPU_SOCKET'], 'gpu': ['PCIE_X16'], 'ram': ['RAM_SLOT'], 'motherboard': ['MOTHERBOARD_MOUNT'], 'psu': ['PSU_MOUNT'] };
   const allowedSlots = slotMap[part.type];
@@ -77,9 +109,13 @@ function calculateSystemStats(installedParts) {
   installedParts.forEach(part => {
     totalCost += part.price_estimate;
     totalWattage += part.specs.wattage || 0;
-    const base = part.specs.performance_score || 0;
-    workstationScore += base * (part.specs.workstation_weight || 0);
-    gamingScore += base * (part.specs.gaming_weight || 0);
+    // Handle Map from Mongoose or Object from JSON
+    const base = (part.specs.get ? part.specs.get('performance_score') : part.specs.performance_score) || 0;
+    const wsWeight = (part.specs.get ? part.specs.get('workstation_weight') : part.specs.workstation_weight) || 0;
+    const gWeight = (part.specs.get ? part.specs.get('gaming_weight') : part.specs.gaming_weight) || 0;
+
+    workstationScore += base * wsWeight;
+    gamingScore += base * gWeight;
   });
 
   const psu = installedParts.find(p => p.type === 'psu');
