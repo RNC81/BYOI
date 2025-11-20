@@ -3,15 +3,14 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const Part = require('./models/Part');
+const Build = require('./models/Build'); // <--- Import du nouveau modèle
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// === DONNÉES POUR LE SEED ===
 const PARTS_DATA = [
   {
     id: 'case_001',
@@ -130,16 +129,81 @@ const PARTS_DATA = [
   }
 ];
 
-// Connexion MongoDB
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log('✅ MongoDB Connected'))
   .catch(err => console.error('❌ MongoDB Connection Error:', err));
 
-// Routes
+// === ROUTES PARTS (Existantes) ===
 app.get('/api/parts', async (req, res) => {
   try {
     const parts = await Part.find();
     res.json(parts);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// === NOUVELLES ROUTES : BUILDS (Sauvegarde) ===
+
+// 1. Sauvegarder une config
+app.post('/api/builds', async (req, res) => {
+  try {
+    const { name, parts, stats } = req.body;
+    
+    // On ne garde que l'essentiel pour la DB
+    const simplifiedParts = parts.map(p => ({
+      partId: p.id,
+      nodeId: p.nodeId,
+      installedAt: p.installedAt
+    }));
+
+    const newBuild = new Build({
+      name: name || "Untitled Build",
+      parts: simplifiedParts,
+      totalCost: stats.totalCost,
+      totalWattage: stats.totalWattage
+    });
+
+    const savedBuild = await newBuild.save();
+    res.status(201).json(savedBuild);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+});
+
+// 2. Récupérer toutes les machines de l'utilisateur
+app.get('/api/builds', async (req, res) => {
+  try {
+    const builds = await Build.find().sort({ createdAt: -1 });
+    res.json(builds);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 3. Charger une build spécifique (avec les détails des pièces)
+app.get('/api/builds/:id', async (req, res) => {
+  try {
+    const build = await Build.findById(req.params.id);
+    if (!build) return res.status(404).json({ message: 'Build not found' });
+    
+    // On doit "réhydrater" les pièces (retrouver leurs specs complètes via l'ID)
+    // Note: Dans une vraie app pro, on utiliserait .populate() de Mongoose, 
+    // mais ici on fait simple car nos IDs sont des Strings custom.
+    
+    const fullParts = [];
+    for (const item of build.parts) {
+      const partDetails = await Part.findOne({ id: item.partId });
+      if (partDetails) {
+        fullParts.push({
+          ...partDetails.toObject(),
+          nodeId: item.nodeId,
+          installedAt: item.installedAt
+        });
+      }
+    }
+
+    res.json({ build, fullParts });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
