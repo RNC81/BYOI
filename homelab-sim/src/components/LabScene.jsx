@@ -1,104 +1,100 @@
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, Environment, Grid, ContactShadows } from '@react-three/drei';
-import { EffectComposer, Bloom, Vignette, Noise } from '@react-three/postprocessing';
+import { OrbitControls, Environment, MeshReflectorMaterial, ContactShadows, Float } from '@react-three/drei';
+import { EffectComposer, Bloom, Vignette, Noise, ChromaticAberration } from '@react-three/postprocessing';
 import { useState, useEffect, useMemo } from 'react';
 import { RoundedBox, CubicBezierLine } from '@react-three/drei';
+import { Vector2 } from 'three';
 
-// --- ASSETS DOMESTIQUES ---
+// --- ASSETS REALISTES ---
 
 function Desk({ position }) {
   return (
     <group position={position}>
-      <RoundedBox args={[5, 0.1, 2.5]} radius={0.05} position={[0, 2.5, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#d4a373" roughness={0.6} />
+      {/* Plateau (Bois Sombre Premium) */}
+      <RoundedBox args={[5, 0.15, 2.5]} radius={0.02} position={[0, 2.5, 0]} castShadow receiveShadow>
+        <meshStandardMaterial 
+          color="#3d2817" 
+          roughness={0.2} 
+          metalness={0.1} 
+        />
       </RoundedBox>
-      <mesh position={[-2, 1.25, 0]} castShadow>
-        <boxGeometry args={[0.1, 2.5, 2]} />
-        <meshStandardMaterial color="#333" />
+      {/* Pieds (Métal Brossé Industriel) */}
+      <mesh position={[-2, 1.25, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.15, 2.5, 2]} />
+        <meshStandardMaterial color="#222" roughness={0.4} metalness={0.8} />
       </mesh>
-      <mesh position={[2, 1.25, 0]} castShadow>
-        <boxGeometry args={[0.1, 2.5, 2]} />
-        <meshStandardMaterial color="#333" />
+      <mesh position={[2, 1.25, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.15, 2.5, 2]} />
+        <meshStandardMaterial color="#222" roughness={0.4} metalness={0.8} />
       </mesh>
     </group>
   );
 }
 
 function ISPBox({ position, onConnect, isConnected }) {
-  // Sécurité : si position est undefined, on met 0,0,0 pour éviter le crash
   const safePos = position || [0, 0, 0];
   const portPos = [safePos[0], safePos[1] - 0.2, safePos[2] + 0.3];
   
   return (
     <group position={safePos}>
-      <RoundedBox args={[0.8, 1.2, 0.4]} radius={0.1}>
-        <meshStandardMaterial color="white" />
+      <RoundedBox args={[0.6, 1.0, 0.2]} radius={0.05} castShadow receiveShadow>
+        <meshPhysicalMaterial 
+            color="#f0f0f0" 
+            roughness={0.2} 
+            metalness={0.1} 
+            clearcoat={1} 
+        />
       </RoundedBox>
-      <mesh position={[0, 0.2, 0.21]}>
-        <circleGeometry args={[0.15]} />
-        <meshBasicMaterial color="#ff0000" />
-      </mesh>
-      <mesh position={[0, -0.3, 0.21]}>
+      {/* LED Status (Glow) */}
+      <mesh position={[0, -0.3, 0.11]}>
          <circleGeometry args={[0.02]} />
-         <meshBasicMaterial color="#00ff00" />
+         <meshBasicMaterial color={isConnected ? "#00ff00" : "#ff3300"} toneMapped={false} />
       </mesh>
-      
+      {/* Port RJ45 */}
       <mesh 
         position={[0, -0.5, 0]} 
         onClick={(e) => { e.stopPropagation(); onConnect('isp-box', portPos); }}
       >
-         <boxGeometry args={[0.2, 0.1, 0.1]} />
-         <meshStandardMaterial color={isConnected ? "#22c55e" : "#333"} />
+         <boxGeometry args={[0.15, 0.05, 0.05]} />
+         <meshStandardMaterial color="#333" />
       </mesh>
     </group>
   );
 }
 
-function WallSocket({ position }) {
-    return (
-        <group position={position}>
-            <mesh>
-                <boxGeometry args={[0.3, 0.3, 0.05]} />
-                <meshStandardMaterial color="white" />
-            </mesh>
-            <mesh position={[0, 0, 0.03]}>
-                <boxGeometry args={[0.15, 0.15, 0.01]} />
-                <meshStandardMaterial color="#ddd" />
-            </mesh>
-        </group>
-    )
-}
-
 function DesktopPC({ position, build, onConnect, isConnected }) {
-  // Position du port Ethernet derrière la tour
   const portPos = [position[0], position[1] + 1.2, position[2] - 0.9]; 
   
   return (
     <group position={position}>
-      <RoundedBox args={[0.8, 1.8, 1.8]} radius={0.05} position={[0, 0.9, 0]} castShadow>
-        <meshStandardMaterial color="#1a1a1a" metalness={0.8} roughness={0.2} />
+      {/* La Tour (Métal Sombre + Vitre) */}
+      <RoundedBox args={[0.8, 1.8, 1.8]} radius={0.02} position={[0, 0.9, 0]} castShadow receiveShadow>
+        <meshStandardMaterial color="#111" metalness={0.9} roughness={0.2} />
       </RoundedBox>
+      
+      {/* Intérieur RGB (Simulation) */}
       <mesh position={[0.41, 0.9, 0]}>
          <planeGeometry args={[1.6, 0.1]} rotation={[0, 0, Math.PI/2]} />
          <meshBasicMaterial color="#00f3ff" toneMapped={false} />
       </mesh>
       
-      {/* Port Réseau (Derrière) */}
+      {/* Port Réseau */}
       <mesh 
         position={[0, 1.2, -0.91]} 
         onClick={(e) => { e.stopPropagation(); onConnect(`pc-${build._id}`, portPos); }}
       >
          <boxGeometry args={[0.2, 0.2, 0.05]} />
-         <meshStandardMaterial color={isConnected ? "#22c55e" : "#555"} />
+         <meshStandardMaterial color={isConnected ? "#22c55e" : "#333"} emissive={isConnected ? "#22c55e" : "#000"} />
       </mesh>
     </group>
   );
 }
 
-function SimpleCable({ start, end }) {
+// Câble Réaliste (Tube au lieu de ligne)
+function RealisticCable({ start, end }) {
     const midPoint = [
         (start[0] + end[0]) / 2,
-        Math.min(start[1], end[1]) - 2,
+        Math.min(start[1], end[1]) - 1.5, // Pendouillage naturel
         (start[2] + end[2]) / 2
     ];
     
@@ -108,8 +104,8 @@ function SimpleCable({ start, end }) {
             end={end}
             midA={midPoint}
             midB={midPoint}
-            color="#333"
-            lineWidth={2}
+            color="#222" // Câble noir mat
+            lineWidth={3}
         />
     )
 }
@@ -147,56 +143,98 @@ export default function LabScene() {
   };
 
   return (
-    <Canvas camera={{ position: [8, 6, 8], fov: 45 }} shadows>
-      <color attach="background" args={['#e0e0e0']} />
+    <Canvas camera={{ position: [6, 5, 8], fov: 40 }} shadows dpr={[1, 2]}>
+      <color attach="background" args={['#1a1a1a']} />
       
-      <Environment preset="apartment" />
-      <ambientLight intensity={0.6} />
-      <directionalLight position={[-5, 5, 5]} intensity={1} castShadow shadow-mapSize={[1024,1024]} />
-      <ContactShadows opacity={0.4} scale={20} blur={2} far={4} resolution={256} color="#000000" />
+      {/* === ÉCLAIRAGE CINÉMATIQUE === */}
+      <Environment preset="city" />
+      <ambientLight intensity={0.2} />
+      {/* Lumière principale (Soleil) */}
+      <directionalLight 
+        position={[-5, 8, 5]} 
+        intensity={2} 
+        castShadow 
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0001}
+      />
+      {/* Lumière de remplissage (Bleutée) */}
+      <spotLight position={[10, 10, -5]} intensity={1} color="#b0c4de" />
+
+      {/* Ombres de contact pour ancrer les objets au sol */}
+      <ContactShadows resolution={1024} scale={50} blur={2} opacity={0.5} far={10} color="#000000" />
+
+      {/* === EFFETS CAMÉRA (POST-PROCESSING) === */}
+      <EffectComposer disableNormalPass>
+         {/* Bloom doux pour les LEDs */}
+         <Bloom luminanceThreshold={1} mipmapBlur intensity={1.2} radius={0.3} />
+         {/* Vignette pour focus central */}
+         <Vignette offset={0.3} darkness={0.6} />
+         {/* Aberration Chromatique subtile sur les bords (Réalisme lentille) */}
+         <ChromaticAberration offset={[0.0005, 0.0005]} />
+         {/* Grain très léger pour casser le côté "3D lisse" */}
+         <Noise opacity={0.015} />
+      </EffectComposer>
 
       <group position={[0, -2, 0]}>
         
-        {/* Sol (Parquet) */}
-        <mesh rotation={[-Math.PI/2, 0, 0]} receiveShadow>
-            <planeGeometry args={[20, 20]} />
-            <meshStandardMaterial color="#8d6e63" />
-        </mesh>
-        {/* Murs */}
-        <mesh position={[0, 5, -5]} receiveShadow>
-            <planeGeometry args={[20, 10]} />
-            <meshStandardMaterial color="#f5f5f5" />
-        </mesh>
-        <mesh position={[-10, 5, 0]} rotation={[0, Math.PI/2, 0]} receiveShadow>
-            <planeGeometry args={[20, 10]} />
-            <meshStandardMaterial color="#f0f0f0" />
+        {/* === LE SOL RÉFLÉCHISSANT (KEY FEATURE) === */}
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+          <planeGeometry args={[50, 50]} />
+          {/* Ce matériel fait toute la différence : Réflexions floutées */}
+          <MeshReflectorMaterial
+            blur={[300, 100]}
+            resolution={1024}
+            mixBlur={1}
+            mixStrength={40} // Force de la réflexion
+            roughness={0.6}  // Aspect parquet vernis un peu usé
+            depthScale={1.2}
+            minDepthThreshold={0.4}
+            maxDepthThreshold={1.4}
+            color="#2a2a2a"  // Sol sombre moderne
+            metalness={0.5}
+          />
         </mesh>
 
-        {/* --- LE COIN TECHNIQUE (Position Absolue maintenant) --- */}
-        <ISPBox position={[-2, 3, -4.9]} onConnect={handleConnect} isConnected={connectedPorts.has('isp-box')} />
-        <WallSocket position={[-1, 2, -4.9]} />
-        <WallSocket position={[-0.5, 2, -4.9]} />
+        {/* Murs (Béton banché ou peinture mate) */}
+        <mesh position={[0, 10, -10]} receiveShadow>
+            <planeGeometry args={[50, 20]} />
+            <meshStandardMaterial color="#e0e0e0" roughness={0.9} />
+        </mesh>
+        <mesh position={[-15, 10, 0]} rotation={[0, Math.PI/2, 0]} receiveShadow>
+            <planeGeometry args={[50, 20]} />
+            <meshStandardMaterial color="#d0d0d0" roughness={0.9} />
+        </mesh>
+
+        {/* --- LE COIN TECHNIQUE --- */}
+        <ISPBox position={[-3, 3, -9.8]} onConnect={handleConnect} isConnected={connectedPorts.has('isp-box')} />
 
         {/* --- LE BUREAU --- */}
-        <Desk position={[0, 0, 0]} />
+        <Desk position={[0, 0, -2]} />
 
-        {/* --- MES MACHINES --- */}
+        {/* --- MES MACHINES (Posées avec physique simulée) --- */}
         {myBuilds.map((build, i) => (
             <DesktopPC 
                 key={build._id} 
                 build={build} 
-                position={[-1.5 + (i * 1.2), 2.6, 0]} 
+                // Positionnées sur le bureau
+                position={[-1.5 + (i * 1.5), 2.6, -2]} 
                 onConnect={handleConnect}
                 isConnected={connectedPorts.has(`pc-${build._id}`)}
             />
         ))}
 
         {/* CÂBLES */}
-        {cables.map((c, i) => <SimpleCable key={i} start={c.startPos} end={c.endPos} />)}
+        {cables.map((c, i) => <RealisticCable key={i} start={c.startPos} end={c.endPos} />)}
 
       </group>
 
-      <OrbitControls makeDefault target={[0, 2, 0]} maxPolarAngle={Math.PI / 2.1} />
+      <OrbitControls 
+        makeDefault 
+        target={[0, 2, 0]} 
+        maxPolarAngle={Math.PI / 2.1} // Empêche de passer sous le sol
+        minDistance={2}
+        maxDistance={15}
+      />
     </Canvas>
   );
 }
