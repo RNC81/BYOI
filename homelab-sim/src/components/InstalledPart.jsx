@@ -42,6 +42,7 @@ function InstalledPart({ part }) {
         );
     }
     
+    
     if(part.type === 'cpu') return <group position={pos}><RoundedBox args={[0.5, 0.5, 0.1]} radius={0.02}><meshStandardMaterial color="#C0C0C0" metalness={1} roughness={0.2} /></RoundedBox></group>;
     
     if(part.type === 'gpu') {

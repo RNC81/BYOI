@@ -95,7 +95,7 @@ function PCCase() {
       </mesh>
 
       {/* === 3. ÉCLAIRAGE INTERNE (RGB GAMING) === */}
-      {/* Bande LED Haut */}
+      {/* Bande LED */}
       <mesh position={[0, 2.9, 0]}>
         <boxGeometry args={[3.5, 0.05, 0.05]} />
         <meshBasicMaterial color="#00f3ff" toneMapped={false} />
